@@ -1,2 +1,1 @@
-# Kaggle-stuff
-# Kaggle-stuff
+# List of all my kernels on Kaggle
