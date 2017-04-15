@@ -1,0 +1,327 @@
+---
+title: 'Exploring "The Academy Awards, 1927-2015" dataset'
+author: "Pranav Pandya | s_pandya@stud.hwr-berlin.de"
+date: "27th February 2017"
+output: html_document
+---
+
+-----------------------------------------------------------
+
+```{r, message=FALSE, warning=FALSE}
+#system("ls ../input", intern=TRUE)
+#dfAA = read.csv("../input/database.csv")
+
+dfAA = read.csv("C:/Users/Pranav Pandya/Documents/R/Kaggle/academy-awards/database.csv")
+
+library(dtplyr)
+library(dplyr)
+library(splitstackshape)
+library(ggplot2) 
+library(ggrepel)
+library(ggalt)
+library(sqldf)
+library(highcharter)
+library(data.table)
+library(DT)
+
+AwYear = data.table(dfAA$Year)
+AwYear = cSplit(as.data.table(AwYear$V1), "V1", "/") 
+names(AwYear)[1] <- "Year"
+AwYear$V1_2 <- NULL
+dfAA$Year = AwYear$Year
+```
+
+
+###1.0 Let's have a look at total number of nominations by year
+```{r, message=FALSE, warning=FALSE}
+tyears <- dfAA %>% group_by(Year) %>% summarise(Total = n()) %>% arrange(desc(Total))
+
+TyrNomPlot =  ggplot(tyears)+ geom_point(aes(Year, Total), size = 4, color = 'grey') +
+                geom_label_repel(aes(Year, Total, fill = factor(Total), label = Total),
+                  fontface = 'bold', color = 'white', box.padding = unit(0.35, "lines"),
+                  point.padding = unit(0.5, "lines"),segment.color = 'grey50')+
+                ggtitle("Total number of nominations by year")+ labs(x="Year",y="Total Nominations") +
+                scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
+                scale_y_continuous(breaks = scales::pretty_breaks(n = 20)) +
+                labs(fill = "Nominations") +
+                theme(legend.title = element_text(face = "bold", size = 14)) + 
+                theme(axis.text=element_text(size=14), axis.title=element_text(size=20,face="bold"))
+```
+
+###1.1 The rise and fall of total number of nominations by years!
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 10}
+TyrNomPlot
+```
+
+### Hmmmmmm! found some regulations (may be constraints) for total number of nominations.
+- Until 1935 : Max 86 nominations 
+- 1935 to 1945 : Minimum 100 and maximum 186 nominations
+- 1945 to 2015 : Not less than 99 and not more than 130 nominations. This is true for last 70 years!!! (I believed that total number of nominations would be increasing by years but that's not the case)
+
+##2.0 So, what are the award categories?
+
+```{r, message=FALSE, warning=FALSE}
+NomNWins <- dfAA %>% group_by(Award) %>% summarise(n = n()) %>%  arrange(-n) %>% 
+glimpse() 
+
+TreeAwCategs = hchart(NomNWins, "treemap", hcaes(x = Award, value = n, color = n))%>%
+      hc_add_theme(hc_theme_google()) %>%
+      hc_title(text = "Academy award categories and total nominations") %>%
+      hc_credits(enabled = TRUE, text = "Sources: Academy of Motion Picture Arts and Sciences", 
+                 style = list(fontSize = "12px"))
+```
+
+```{r, message=FALSE, warning=FALSE}
+TreeAwCategs
+```
+
+###2.1 List of award categories and total nominations
+```{r, message=FALSE, warning=FALSE, fig.width= 15}
+by_AwCategs <- dfAA %>% group_by(Award) %>% summarise(Total = n()) %>% arrange(desc(Total))
+datatable(by_AwCategs)
+```
+
+##Actors
+###3.0 Let's have a look at actors in lead role with total nominations
+```{r, message=FALSE, warning=FALSE, fig.width= 15}
+Actors= sqldf("select * from dfAA where Award == 'Actor' OR Award == 'Actor in a Leading Role'")
+
+#Correcting typos in dataset
+Actors_clean = data.table(sqldf(c("UPDATE Actors SET Name = 'Daniel Day Lewis' 
+                            WHERE Name = 'Daniel Day-Lewis'", 
+                            "SELECT * FROM main.Actors"), method = "raw"))
+
+Actors$Name = Actors_clean$Name
+
+Actr_Noms <- Actors %>% group_by(Name) %>% summarise(n = n()) %>%  arrange(-n)  %>% 
+glimpse() 
+
+TreeActrNoms = hchart(Actr_Noms, "treemap", hcaes(x = Name, value = n, color = n)) %>%
+                hc_title(text = "Actors (lead role) with total nominations") %>%
+                hc_add_theme(hc_theme_google()) %>%
+                hc_credits(enabled = TRUE, 
+                           text = "Sources: Academy of Motion Picture Arts and Sciences", 
+                           style = list(fontSize = "12px")) 
+
+```
+
+###3.1 Actors in lead role with total nominations (Treemap)
+```{r, message=FALSE, warning=FALSE, fig.width= 15}
+TreeActrNoms
+```
+
+###3.2 Dot plot for actors in lead role with total nominations
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 33}
+Nom_actors <- Actors %>% group_by(Name) %>% summarise(Total = n()) %>% arrange(desc(Total))
+
+Plot_Nactors =  ggplot(Nom_actors)+ geom_point(aes(Total, Name), size = 4, color = 'grey') +
+                geom_label_repel(aes(Total, Name, fill = factor(Total), label = Name),
+                  fontface = 'bold', color = 'white', box.padding = unit(0.35, "lines"),
+                  point.padding = unit(0.5, "lines"),segment.color = 'grey50')+
+                ggtitle("Total number of nominations by actors in lead role")+ 
+                labs(x="Total Nominations",y="Name of the Actor in LEAD ROLE") +
+                scale_x_continuous(breaks = scales::pretty_breaks(n = 1))+
+                geom_text(aes(Total, Name, label = ifelse(Total>2, (Total), '')), 
+                      size = 4, color = 'grey40', fontface = 'bold', hjust = 0, nudge_x = 0.05) +
+                labs(fill = "Nominations") +
+                theme(legend.title = element_text(face = "bold", size = 14)) +
+                theme(axis.title=element_text(size=20,face="bold"))
+
+Plot_Nactors
+```
+
+###3.3  List of total nominations for best actor (lead role)
+```{r, message=FALSE, warning=FALSE}
+datatable(Nom_actors)
+```
+
+
+##So, who are the winners? 
+```{r, message=FALSE, warning=FALSE, fig.width= 15}
+
+Win_Actors <- Actors[!is.na(Actors$Winner),] %>% group_by(Name) %>% summarise(Total = n()) %>% arrange(desc(Total))
+
+W_actors =  ggplot(Win_Actors)+ geom_point(aes(Total, Name), size = 4, color = 'grey') +
+                geom_label_repel(aes(Total, Name, fill = factor(Total), label = Name),
+                  fontface = 'bold', color = 'white', box.padding = unit(0.35, "lines"),
+                  point.padding = unit(0.5, "lines"),segment.color = 'grey50')+
+                ggtitle("Total number of awards by actors in lead role")+ 
+                labs(x="Total awards",y="Name of the Actor in LEAD ROLE") +
+                scale_x_continuous(breaks = scales::pretty_breaks(n = 1))+
+                geom_text(aes(Total, Name, label = ifelse(Total>1, (Total), '')), 
+                      size = 4, color = 'grey40', fontface = 'bold', hjust = 0, nudge_x = 0.05) +
+                labs(fill = "Wins") +
+                theme(legend.title = element_text(face = "bold", size = 14)) +
+                theme(axis.title=element_text(size=20,face="bold"))
+```
+
+###4.1 Actors in lead role with total academy awards received
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 15}
+W_actors
+```
+
+###4.2  List of actors in lead role with total academy awards received
+```{r, message=FALSE, warning=FALSE}
+datatable(Win_Actors)
+```
+
+##Actresses
+###5.1 Actresses in lead role with total nominations (Treemap)
+```{r, message=FALSE, warning=FALSE, fig.width= 15}
+Actresses= sqldf("select * from dfAA where Award == 'Actress' OR Award == 'Actress in a Leading Role'")
+
+Actrs_Noms <- Actresses %>% group_by(Name) %>% summarise(n = n()) %>%  arrange(-n)  %>% 
+glimpse() 
+
+TreeActrsNoms = hchart(Actrs_Noms, "treemap", hcaes(x = Name, value = n, color = n)) %>%
+                hc_title(text = "Actresses (lead role) with total nominations") %>%
+                hc_add_theme(hc_theme_google()) %>%
+                hc_credits(enabled = TRUE, 
+                           text = "Sources: Academy of Motion Picture Arts and Sciences", 
+                           style = list(fontSize = "12px")) 
+
+TreeActrsNoms
+```
+
+
+
+###5.2 Dot plot for Actresses in lead role with total nominations
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 33}
+Nom_actresses <- Actresses %>% group_by(Name) %>% summarise(Total = n()) %>% arrange(desc(Total))
+
+Plot_Nactresses =  ggplot(Nom_actresses)+ geom_point(aes(Total, Name), size = 4, color = 'grey') +
+                    geom_label_repel(aes(Total, Name, fill = factor(Total), label = Name),
+                      fontface = 'bold', color = 'white', box.padding = unit(0.35, "lines"),
+                      point.padding = unit(0.5, "lines"),segment.color = 'grey50')+
+                    ggtitle("Total number of nominations by actresses in lead role")+ 
+                    labs(x="Total nominations",y="Name of the Actress in lead role") +
+                    scale_x_continuous(breaks = scales::pretty_breaks(n = 1))+
+                geom_text(aes(Total, Name, label = ifelse(Total>3, (Total), '')), 
+                      size = 4, color = 'grey40', fontface = 'bold', hjust = 0, nudge_x = 0.05) +
+                labs(fill = "Nominations") +
+                theme(legend.title = element_text(face = "bold", size = 14))+
+                theme(axis.title=element_text(size=20,face="bold"))
+
+Plot_Nactresses
+```
+
+###5.3  List of total nominations for best Actress (lead role)
+```{r, message=FALSE, warning=FALSE}
+datatable(Nom_actresses)
+```
+
+
+##So who are the winners in this category?
+```{r, message=FALSE, warning=FALSE, fig.width= 15}
+
+Win_Actress <- Actresses[!is.na(Actresses$Winner),] %>% group_by(Name) %>% summarise(Total = n()) %>% arrange(desc(Total))
+
+W_actress =  ggplot(Win_Actress)+ geom_point(aes(Total, Name), size = 4, color = 'grey') +
+                geom_label_repel(aes(Total, Name, fill = factor(Total), label = Name),
+                  fontface = 'bold', color = 'white', box.padding = unit(0.35, "lines"),
+                  point.padding = unit(0.5, "lines"),segment.color = 'grey50')+
+                ggtitle("Total number of awards by actresses in lead role")+ 
+                labs(x="Total awards",y="Name of the Actress in lead role") +
+                scale_x_continuous(breaks = scales::pretty_breaks(n = 1))+
+                geom_text(aes(Total, Name, label = ifelse(Total>1, (Total), '')), 
+                      size = 4, color = 'grey40', fontface = 'bold', hjust = 0, nudge_x = 0.05) +
+                labs(fill = "Wins") +
+                theme(legend.title = element_text(face = "bold", size = 14)) +
+                theme(axis.title=element_text(size=20,face="bold"))
+```
+
+###6.1 Best actress in lead role with total number of academy awards received
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 15}
+W_actress
+```
+
+###6.2  List of best actress in lead role with total number of academy awards received
+```{r, message=FALSE, warning=FALSE}
+datatable(Win_Actress)
+```
+
+##Films
+###7.0 Nominations for Best Picture by year 
+##### (Note: Zoom in for best view)
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 95}
+dfFilm= sqldf("select * from dfAA where Award == 'Best Picture' OR Award == 'Best Motion Picture'")
+axisText = element_text(face = "bold", color = "black", size = 10)
+PlotFNoms = ggplot(dfFilm)+ geom_point(aes(Year, Ceremony), size = 4, color = 'grey') +
+                geom_label_repel(aes(Year, Ceremony, fill = factor(-Year), label = Name),
+                  fontface = 'bold', color = 'white', box.padding = unit(0.35, "lines"), 
+                  point.padding = unit(0.5, "lines"),segment.color = 'grey50')+ 
+                ggtitle("Nominations for Best Picture by year")+  
+                labs(x="Year",y="Ceremony") +
+                geom_text(aes(Year, Ceremony, label = Year), 
+                          size = 4, color = 'grey20', fontface = 'bold', hjust = 0, nudge_x = 0.1) +
+                scale_x_continuous(limit = c(1942, 2040), breaks=seq(0,2020, by=5))+
+                scale_y_continuous(limit = c(15, 90), breaks=seq(15,88, by=1)) + 
+                theme(legend.position = "none")+ 
+                theme(axis.text = axisText) +
+                theme(axis.title=element_text(size=22,face="bold"))
+
+PlotFNoms
+```
+
+##And the winners for Best Picture are... 
+###7.1 Academy award for Best Pictures by year 
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 40}
+
+wFilm = sqldf("select * from dfFilm where Winner is not null")
+
+PlotwFilms = ggplot(wFilm)+ geom_point(aes(Year, Ceremony), size = 1.5, color = 'grey40') +
+                geom_label_repel(aes(Year, Ceremony, fill = Winner, label = Name),
+                  fontface = 'bold', color = 'white', box.padding = unit(0.35, "lines"), 
+                  point.padding = unit(0.5, "lines"),segment.color = 'grey50')+ 
+                ggtitle("Academy award for Best Pictures by year")+  
+                labs(x="Year",y="Ceremony") +
+                geom_text(aes(Year, Ceremony, label = Year), 
+                          size = 4, color = 'grey50', fontface = 'bold', vjust = 1, hjust = 1, nudge_x = -0.1) + 
+                geom_text(aes(Year, Ceremony, label = Film), 
+                          size = 3, color = 'grey40', fontface = 'italic', vjust = 1, hjust = 0, nudge_x = 0.2) +
+                scale_x_continuous(limit = c(1930, 2045), breaks=seq(0,2015, by=5))+
+                scale_y_continuous(limit = c(15, 89), breaks=seq(17,88, by=1)) + 
+                theme(legend.position = "none")+ 
+                theme(axis.text = axisText) +
+                theme(axis.title=element_text(size=22,face="bold"))
+
+PlotwFilms
+```
+
+###7.2  List of best picture nominations and winners by year
+```{r, message=FALSE, warning=FALSE}
+df_nFilms = dfFilm[, c("Year", "Award", "Name", "Winner")]
+datatable(df_nFilms)
+```
+
+##Pending
+
+##8.0 All about Leonardo DiCaprio
+```{r, message=FALSE, warning=FALSE}
+df_ActrAll = sqldf("select * from dfAA where Award == 'Actor' OR Award == 'Actor in a Leading Role'")
+df_wActrAll = sqldf("select * from df_ActrAll where Winner == '1'")
+
+
+library(plotly)              
+ggplot(df_wActrAll) + 
+  geom_point(aes(x = Year, y = Ceremony, color = -Year), size = 3) + 
+  ggtitle("Interactive plot for nominations of all actors (lead role)") +  
+  labs(x="Year",y="Name of the actor") + 
+  geom_text(aes(Year, Ceremony, label = Name), size = 3, color = 'grey40', fontface = 'bold', vjust = 1, hjust = 0, nudge_y = -1) + 
+  geom_text(aes(Year, Ceremony, label = Film), size = 3, color = 'grey60', fontface = 'bold', vjust = 1, hjust = 0, nudge_y = -2) + 
+  
+                scale_x_continuous(limit = c(1930, 2045), breaks=seq(0,2015, by=5))+
+                scale_y_continuous(limit = c(15, 89), breaks=seq(17,88, by=1)) + 
+                theme(legend.position = "none")+ 
+                theme(axis.text = axisText) +
+                theme(axis.title=element_text(size=22,face="bold"))
+ggplotly()
+
+plot_ly(df_wActrAll, x = ~Year, y = ~Name, color = ~factor(Film), type = "scatter")
+
+```
+
+#Martin Scorsese
+
+
