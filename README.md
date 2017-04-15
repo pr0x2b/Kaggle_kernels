@@ -1,8 +1,8 @@
 # List of all my kernels on Kaggle
 
-1. Terrorist attacks around the world (1970 -2015)
-  https://www.kaggle.com/pranav84/d/START-UMD/gtd/terrorist-attacks-around-the-world-1970-2015
-  in Global Terrorism Database
+1. Terrorist attacks around the world (1970 -2015) <br>
+  https://www.kaggle.com/pranav84/d/START-UMD/gtd/terrorist-attacks-around-the-world-1970-2015<br>
+  in Global Terrorism Database <br>
   R
 
 2. Visualizing Terrorist Attacks on India
