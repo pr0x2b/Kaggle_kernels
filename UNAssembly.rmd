@@ -1,0 +1,420 @@
+---
+title: "UN Resolutions - Yes Votes and Power Players!"
+author: "Pranav Pandya | s_pandya@stud.hwr-berlin.de"
+date: "8th March 2017"
+output: html_document
+---
+
+-----------------------------------------------------------
+
+###Main contents of this report:
+- Percentage yes vote analysis by year, countries and UN resolution categories
+- Focused countries: Great power countries and potential super power countries
+- Trends analysis by adding context (resolution types)
+- Linear regression for predictive anlysis
+- Visualizations to represent statistical analysis
+
+```{r, message=FALSE, warning=FALSE}
+library(dplyr)
+library(broom)
+library(tidyr)
+library(purrr)
+library(ggplot2)
+library(ggrepel)
+library(DT)
+library(scales)
+library(readr)
+
+#resolutions <- read_csv("../input/resolutions.csv")
+#states <- read_csv("../input/states.csv")#
+#votes <- read_csv("../input/votes.csv")
+
+resolutions <- read_csv("resolutions.csv")
+states <- read_csv("states.csv")
+votes <- read_csv("votes.csv")
+
+#subset votes by selecting Yes, No and Abstain
+votes_processed <- votes %>% 
+    filter(vote <=3) %>% 
+    mutate(year = assembly_session + 1945) %>% 
+    select(assembly_session, vote_id, year, resolution, state_name, vote) %>% 
+    rename(session = assembly_session, country = state_name)
+
+resolutions <- resolutions %>% rename(session = assembly_session)
+
+by_year <- votes_processed %>%
+    group_by(year) %>%
+    summarise(total = n(), yes_percent = mean(vote == 1)) %>%  
+    arrange(yes_percent) %>%
+    filter(total>100) 
+
+by_country <- votes_processed %>%
+    group_by(country) %>%
+    summarise(total = n(), yes_percent = mean(vote == 1)) %>%
+    arrange(desc(yes_percent)) %>% filter(total> 100)
+
+by_year_country <- votes_processed %>%
+    group_by(year, country) %>%
+    summarize(total = n(), yes_percent = mean(vote == 1)) 
+
+```
+
+###Great Powers and Potential Super Powers
+- The United Nations Security Council "power of veto" refers to the veto power wielded solely by the five permanent members of the United Nations Security Council (**China, France, Russia, United Kingdom, and United States**), enabling them to prevent the adoption of any "substantive" resolution. 
+- A great power is a sovereign state that is recognized as having the ability and expertise to exert its influence on a global scale. Geramny and Japan are the only two great powers without UN Veto power as of now.
+- No agreed definition of what is a 'superpower' exists, and may differ between sources. However, a fundamental characteristic that is consistent with all definitions of a superpower is a nation or state that has mastered the seven dimensions of state power; geography, population, economy, resources, military, diplomacy and national identity. 
+- Currently, only the **United States** fulfills the criteria to be considered a superpower. States most commonly described as being potential superpowers include the **European Union, Brazil, Russia, India and China**.
+- Collectively these potential superpowers, as well as the United States, comprise 68.0% of global nominal GDP, 62.4% of global GDP (PPP), more than one third of the total land area and more than 50% of the world's population. 
+<br>
+- In short, unusual trend in positive vote on UN resolution from any of these countries is probably a matter of concern. (Trend for EU countries is after this chart.)
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 8}
+gsp_countries <- c("United States of America", "United Kingdom", "Russia", "France", 
+                  "China", "Germany", "Japan", "India", "Brazil")
+gnsuper_powers <- by_year_country %>% filter(country %in% gsp_countries)
+plot_great_n_super_powers <- gnsuper_powers %>%
+  ggplot()+
+    geom_line(aes(year, yes_percent, color = country), size = 1.1) +
+    facet_wrap(~ country,  ncol = 3)+
+    ggtitle("Trend in Percentage Yes Votes by the Great Powers & Potential Super Powers by Years")+ 
+    labs(x="Year",y="Percentage Yes") + 
+    theme(strip.text.x = element_text(size = 12, face = "bold", colour = "steelblue4")) +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(legend.position = "bottom")+ labs(color = "Great Powers & Potential Super Powers") +  
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16))
+
+plot_great_n_super_powers
+```
+- Trend from USA is particulary noticable here followed by UK and France. Gradually downward trend means agreement with United Nations resolutions is going down and down. Please note that this just a high level overview and it shows trend just by years and percentage of yes votes. This trend depends on many other factors such as yes on which type of resolution which we will explore further. 
+
+
+###EU Countries as a Potential Super Power
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 16}
+eu_countries <- c("Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czech Republic", "Denmark", 
+                  "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Ireland", "Italy",
+                  "Latvia", "Lthuania", "Luxembourg", "Malta", "Netherlands", "Poland", "Portugal", 
+                  "Tomania", "Slovakia", "Slovenia", "Spain", "Sweden", "United Kingdom")
+
+pot_super_power_EU <- by_year_country %>% filter(country %in% eu_countries)
+plot_pot_super_power_EU <- pot_super_power_EU %>%
+  ggplot()+
+    geom_line(aes(year, yes_percent, color = country), size = 1.1) +
+    facet_wrap(~ country,  ncol = 4)+
+    ggtitle("Trend in Percentage Yes Votes by Europe (as a Potential Super Power) by Years")+ 
+    labs(x="Year",y="Percentage Yes") + 
+    theme(strip.text.x = element_text(size = 12, face = "bold", colour = "steelblue4")) +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(legend.position = "bottom")+ labs(color = "EU Countries") +  
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16))
+
+plot_pot_super_power_EU
+```
+- Overall and on average looks alright (except the UK and France). 
+
+
+###Now, let's quantify the trends and estimate the probability of change each year of countries voting "yes" to UN resolution.
+####Linear regression on US, Russia, China and India
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 8}
+#Percentage Yes votes from each of above mentioned countries by year
+US_by_year <- by_year_country %>% filter(country == "United States of America")
+UK_by_year <- by_year_country %>% filter(country == "United Kingdom")
+DE_by_year <- by_year_country %>% filter(country == "Germany")
+RU_by_year <- by_year_country %>% filter(country == "Russia")
+CN_by_year <- by_year_country %>% filter(country == "China")
+JP_by_year <- by_year_country %>% filter(country == "Japan")
+FR_by_year <- by_year_country %>% filter(country == "France")
+IN_by_year <- by_year_country %>% filter(country == "India")
+BR_by_year <- by_year_country %>% filter(country == "Brazil")
+
+#Linear regression
+US_fit <- lm(yes_percent ~ year, data = US_by_year)
+UK_fit <- lm(yes_percent ~ year, data = UK_by_year)
+DE_fit <- lm(yes_percent ~ year, data = DE_by_year)
+RU_fit <- lm(yes_percent ~ year, data = RU_by_year)
+CN_fit <- lm(yes_percent ~ year, data = CN_by_year)
+JP_fit <- lm(yes_percent ~ year, data = JP_by_year)
+FR_fit <- lm(yes_percent ~ year, data = FR_by_year)
+IN_fit <- lm(yes_percent ~ year, data = IN_by_year)
+BR_fit <- lm(yes_percent ~ year, data = BR_by_year)
+
+US_probability = tidy(US_fit) %>% filter(term == "year")
+UK_probability = tidy(UK_fit) %>% filter(term == "year")
+DE_probability = tidy(DE_fit) %>% filter(term == "year")
+RU_probability = tidy(RU_fit) %>% filter(term == "year")
+CN_probability = tidy(CN_fit) %>% filter(term == "year")
+JP_probability = tidy(JP_fit) %>% filter(term == "year")
+FR_probability = tidy(FR_fit) %>% filter(term == "year")
+IN_probability = tidy(IN_fit) %>% filter(term == "year")
+BR_probability = tidy(BR_fit) %>% filter(term == "year")
+
+```
+
+####Simple interpretation of Estimate and P value:
+- Value of Estimate coefficient explains increase or decrease on percentage yes vote by year. Estimate value for USA indicates that probability of voting "yes" to UN resolution will decrease by -0.006440 percent in upcoming years.
+- P value defines whether a trend could be due to chance. In general, p-values below 0.05 are significant. P value for the USA is 3.831e-13 (0.00000000000038) which means correlation between year and predicting percentage yes vote is very significant. However P values for Japan and China indicates that the trend is just by chance, there is no correlation between trend in year and pecentage yes votes.
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 8}
+US_probability
+UK_probability
+DE_probability
+RU_probability
+CN_probability
+JP_probability
+FR_probability
+IN_probability
+BR_probability 
+```
+
+###Now let's analyze countries where the trend is probably not due to chance.
+
+```{r, message=FALSE, warning=FALSE}
+country_coef <- by_year_country %>%
+  group_by(country) %>%
+  nest(-country) %>%
+  mutate(model = map(data, ~ lm(yes_percent ~ year, .)), tidied = map(model, tidy)) %>%
+  unnest(tidied)
+
+#Filter countries where P value is less than 0.05
+signif_countries <- country_coef %>%
+    filter(term == "year") %>%
+    mutate(p.adjusted = p.adjust(p.value)) %>%
+    filter(p.adjusted < 0.05)
+
+slope_countries <- signif_countries %>% arrange(desc(estimate))
+positive_slope_countries <- signif_countries %>% arrange(desc(estimate)) %>% head(10)
+negative_slope_countries <- signif_countries %>% arrange(estimate) %>% head(10)
+```
+
+
+###Countries whose percentage of "yes" votes is changing most quickly over time.
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 18}
+slope_countries %>% 
+  ggplot()+
+    geom_point(aes(estimate, country, color = p.adjusted), size = 5) +
+    geom_text_repel(aes(estimate, country, color = p.adjusted, label = country),
+                     fontface = 'bold', size = 5, box.padding = unit(0.35, "lines"), 
+                    point.padding = unit(0.5, "lines"),segment.color = 'grey50') +
+    ggtitle("Countries where Yes vote is changing most quickly over time")+ 
+    labs(x="Estimate (related to change in % Yes votes)", y="Country") +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(legend.position = "right")+ labs(color = "P value") +  
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text.x=element_text(size=14), axis.title=element_text(size=16))
+```
+
+####Top 10 countries with positive slope (expected increase in % postive votes)
+```{r, message=FALSE, warning=FALSE, fig.width= 15}
+dt_psc <- positive_slope_countries %>% select(country, term, estimate, p.adjusted)
+datatable(dt_psc, options = list(columnDefs = list(list(className = 'dt-center', targets = 4)),
+                                 pageLength = 5,lengthMenu = c(5, 10)))
+```
+
+####Top 10 countries with negative slope (expected decrease in % postive votes)
+```{r, message=FALSE, warning=FALSE, fig.width= 15}
+dt_nsc <- negative_slope_countries %>% select(country, term, estimate, p.adjusted)
+datatable(dt_nsc, options = list(columnDefs = list(list(className = 'dt-center', targets = 4)),
+                                 pageLength = 5,lengthMenu = c(5, 10)))
+```
+
+
+###Let's choose one random country and see how they vote on human rights resolutions
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 8}
+#joining with resolutions dataset
+vp_res <- votes_processed %>% inner_join(resolutions, by = c("session", "vote_id", "resolution"))
+
+#Let's select India
+IND_hr_by_year <- vp_res %>% group_by(year) %>% 
+  filter(country == "India", human_rights == 1) %>%
+  summarise(yes_percent = mean(vote == 1)) 
+
+IND_hr_by_year %>%
+  ggplot()+
+    geom_line(aes(year, yes_percent), color = 'dodgerblue', size = 1) +
+    ggtitle("Trend in Percentage Yes Votes by India on Human Rights Resolutions by Years")+ 
+    labs(x="Year",y="Percentage Yes") + 
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16))
+```
+- Hmmmm! Nice. On average, it's observed that India cares for human right resolutions. Now let's compare with some other country (let's take USA).
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 8}
+#joining with resolutions dataset
+USA_hr_by_year <- vp_res %>% group_by(year) %>% 
+  filter(country == "United States of America", human_rights == 1) %>%
+  summarise(yes_percent = mean(vote == 1)) 
+
+USA_hr_by_year %>%
+  ggplot()+
+    geom_line(aes(year, yes_percent),  color = '#FF0000', size = 1) +
+    ggtitle("Trend in Percentage Yes Votes by USA on Human Rights Resolutions by Years")+ 
+    labs(x="Year",y="Percentage Yes") + 
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16))
+```
+- I didn't expected that! (I kindly ask for a feedback from an expert on this subject to identify whether the plot is true or have I missed/ messed something while data preparation! )
+
+###Let's also see how different countries votes on different resolutions
+```{r, message=FALSE, warning=FALSE}
+votes_ycr <- vp_res %>%
+  gather(resolution_type, has_resolution_type, colonization:economic_development) %>%
+  filter(has_resolution_type == 1)
+
+by_country_year_resolution_type <- votes_ycr %>%
+  group_by(country, year, resolution_type) %>%
+  summarise(total = n(), yes_percent = mean(vote == 1))  %>%
+  ungroup()
+
+#Let's select our great powers, few potential super powers and few other countries
+US_by_country_year_resolution_type <- by_country_year_resolution_type %>% 
+  filter(country == "United States of America") 
+UK_by_country_year_resolution_type <- by_country_year_resolution_type %>% filter(country == "United Kingdom")
+RU_by_country_year_resolution_type <- by_country_year_resolution_type %>% filter(country == "Russia")
+CN_by_country_year_resolution_type <- by_country_year_resolution_type %>% filter(country == "China")
+DE_by_country_year_resolution_type <- by_country_year_resolution_type %>% filter(country == "Germany")
+IN_by_country_year_resolution_type <- by_country_year_resolution_type %>% filter(country == "India")
+AF_by_country_year_resolution_type <- by_country_year_resolution_type %>% filter(country == "Afghanistan")
+NK_by_country_year_resolution_type <- by_country_year_resolution_type %>% filter(country == "North Korea")
+```
+
+###Visualizing trends in resolution types by countries
+````{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 8}
+US_by_country_year_resolution_type %>%
+  ggplot()+
+    geom_line(aes(year, yes_percent, color = resolution_type), size = 1.1) +
+    facet_wrap(~ resolution_type,  ncol = 3)+
+    ggtitle("Trend in Percentage Yes Votes by Resolution Types by USA")+ 
+    labs(x="Year",y="Percentage Yes") + 
+    theme(strip.text.x = element_text(size = 14, face = "bold", colour = "steelblue4")) +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(legend.position = "bottom")+ labs(color = "USA") +  
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16))
+
+UK_by_country_year_resolution_type %>%
+  ggplot()+
+    geom_line(aes(year, yes_percent, color = resolution_type), size = 1.1) +
+    facet_wrap(~ resolution_type,  ncol = 3)+
+    ggtitle("Trend in Percentage Yes Votes by Resolution Types by United Kingdom")+ 
+    labs(x="Year",y="Percentage Yes") + 
+    theme(strip.text.x = element_text(size = 14, face = "bold", colour = "steelblue4")) +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(legend.position = "bottom")+ labs(color = "United Kingdom") +  
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16))
+
+RU_by_country_year_resolution_type %>%
+  ggplot()+
+    geom_line(aes(year, yes_percent, color = resolution_type), size = 1.1) +
+    facet_wrap(~ resolution_type,  ncol = 3)+
+    ggtitle("Trend in Percentage Yes Votes by Resolution Types by Russia")+ 
+    labs(x="Year",y="Percentage Yes") + 
+    theme(strip.text.x = element_text(size = 14, face = "bold", colour = "steelblue4")) +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(legend.position = "bottom")+ labs(color = "Russia") +  
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16))
+
+CN_by_country_year_resolution_type %>%
+  ggplot()+
+    geom_line(aes(year, yes_percent, color = resolution_type), size = 1.1) +
+    facet_wrap(~ resolution_type,  ncol = 3)+
+    ggtitle("Trend in Percentage Yes Votes by Resolution Types by China")+ 
+    labs(x="Year",y="Percentage Yes") + 
+    theme(strip.text.x = element_text(size = 14, face = "bold", colour = "steelblue4")) +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(legend.position = "bottom")+ labs(color = "China") +  
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16))
+
+
+DE_by_country_year_resolution_type %>%
+  ggplot()+
+    geom_line(aes(year, yes_percent, color = resolution_type), size = 1.1) +
+    facet_wrap(~ resolution_type,  ncol = 3)+
+    ggtitle("Trend in Percentage Yes Votes by Resolution Types by Germany")+ 
+    labs(x="Year",y="Percentage Yes") + 
+    theme(strip.text.x = element_text(size = 14, face = "bold", colour = "steelblue4")) +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(legend.position = "bottom")+ labs(color = "German") +  
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16))
+
+IN_by_country_year_resolution_type %>%
+  ggplot()+
+    geom_line(aes(year, yes_percent, color = resolution_type), size = 1.1) +
+    facet_wrap(~ resolution_type,  ncol = 3)+
+    ggtitle("Trend in Percentage Yes Votes by Resolution Types by India")+ 
+    labs(x="Year",y="Percentage Yes") + 
+    theme(strip.text.x = element_text(size = 14, face = "bold", colour = "steelblue4")) +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(legend.position = "bottom")+ labs(color = "India") +  
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16))
+
+AF_by_country_year_resolution_type %>%
+  ggplot()+
+    geom_line(aes(year, yes_percent, color = resolution_type), size = 1.1) +
+    facet_wrap(~ resolution_type,  ncol = 3)+
+    ggtitle("Trend in Percentage Yes Votes by Resolution Types by Afghanistan")+ 
+    labs(x="Year",y="Percentage Yes") + 
+    theme(strip.text.x = element_text(size = 14, face = "bold", colour = "steelblue4")) +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(legend.position = "bottom")+ labs(color = "Afghanistan") +  
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16))
+
+NK_by_country_year_resolution_type %>%
+  ggplot()+
+    geom_line(aes(year, yes_percent, color = resolution_type), size = 1.1) +
+    facet_wrap(~ resolution_type,  ncol = 3)+
+    ggtitle("Trend in Percentage Yes Votes by Resolution Types by North Korea")+ 
+    labs(x="Year",y="Percentage Yes") + 
+    theme(strip.text.x = element_text(size = 14, face = "bold", colour = "steelblue4")) +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 16)) +
+    theme(legend.position = "bottom")+ labs(color = "North Korea") +  
+    theme(plot.title = element_text(size = 24)) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16))
+
+```
+
+##### At this point, I must say thank you very much to you if you are reading this line. I really appreciate your time spent and interest taken in reading this report. I would highly appreciate any comment, feedback or recommendation regarding coding, visualization or any aspect of this report.
+
+
+#Detecting a trend by resolution_type
+
+```{r}
+#Which country has strongest trend within particular resolution_type
+
+# Fit model on the by_country_year_resolution_type dataset
+#country_resolution_type_coefs <- by_country_year_resolution_type %>%
+#  nest(-country, -resolution_type) %>%
+#  mutate(model = map(data, ~lm(percent_yes ~ year, data = .)), tidied = map(model, tidy)) %>%
+#  unnest(tidied)
+ 
+#country_resolution_type_coefs 
+```
+
+
+
+
+
+
+

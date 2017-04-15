@@ -1,0 +1,274 @@
+---
+title: "What's Wrong With Sweden These Days!!!"
+author: "Pranav Pandya | s_pandya@stud.hwr-berlin.de"
+date: "13th March 2017"
+output: html_document
+---
+
+-----------------------------------------------------------
+<p>A new ranking from U.S. News & World Report (https://www.usnews.com/news/best-countries/women-full-list, dated 8th March 2017) suggests that Sweden is #1 in Best Countries for Women. Gender equality is one of the "cornerstones" of society in Sweden, making it the best country for women to live in. Nearly two-thirds of university degrees are awarded to women, and around three months of leave are given to each parent during parental leave. <br>
+But there is a dark side....(which we will explore)</p>
+
+![](http://www.barenakedislam.com/wp-content/uploads/2016/03/swedicide-1.jpg) 
+
+<br>
+<h4>
+Let's do exploratory data analysis of reported crimes in Sweden from 1950 to 2015 and see if it's really as shocking as heard in media. I am going to use Highcharter alongwith plotly for interactive visualization. </h4> 
+
+```{r, message=FALSE, warning=FALSE}
+library(dplyr)
+library(tidyr)
+library(reshape2)
+library(DT)
+library(highcharter)
+library(ggplot2)
+library(plotly)
+library(gridExtra)
+
+#dfC <- read.csv("../input/reported.csv")
+dfC <- read.csv("reported.csv")
+```
+
+####First, let's compare total number of crimes with total number of reported offenses in some categories.
+```{r, message=FALSE, warning=FALSE, fig.width= 10, fig.height= 6}
+dfC %>% 
+  select(Year, fraud, crimes.total, stealing.general, other.penal.crimes) %>% 
+  plot_ly(x = ~Year, y = ~crimes.total, name = 'Total Crimes', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~stealing.general, name = 'Stealing (gen)', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~fraud, name = 'Fraud', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~other.penal.crimes, name = 'Penal Crimes (other)', type = 'scatter', mode = 'lines') %>%
+  layout(legend = list(orientation = 'h'))
+```
+
+####Sweden has always been in the news recently due to growing sexual offences. Let's check the same with historical data.
+```{r, message=FALSE, warning=FALSE}
+dfC %>% 
+  select(Year, sexual.offenses) %>%
+  hchart("scatter", hcaes(Year, sexual.offenses, color = -(sexual.offenses), size = sexual.offenses),
+                       dataLabels = list(enabled = TRUE, format = "{point.label}")) %>%
+  hc_title(text = "By Total Number of Sexual Offenses") %>%
+  hc_tooltip(useHTML = TRUE,
+             headerFormat = "<table>",
+             pointFormat = paste("<tr><th colspan=\"1\"><b>{point.label}</b></th></tr>",
+                                 "<tr><th>Year :</th<td> {point.x} </td></tr>",
+                                 "<tr><th>Sexual offenses :</th<td> {point.y} </td></tr>",
+                                 "<tr><th></th><td>{point.valuecolor} </td></tr>"),
+             footerFormat = "</table>") %>% 
+  hc_add_theme(hc_theme_ffx())  %>% 
+  hc_chart(zoomType = "xy") %>% 
+  hc_credits(enabled = TRUE, text = "Sources: Swedish crime statistics | https://www.bra.se/", 
+             style = list(fontSize = "12px"))
+
+```
+<br>
+<h4> Although we don't have figures for 2016 but checking news for past year suggests that the rate is still growing!
+![](http://www.barenakedislam.com/wp-content/uploads/2016/03/muslim-spitting-on-swedish-woman-james-wood-tweet.png) 
+
+```{r, message=FALSE, warning=FALSE}
+dfC %>% 
+  select(Year, rape) %>%
+  hchart("scatter", hcaes(Year, rape, color = -(rape), size = rape),
+                       dataLabels = list(enabled = TRUE, format = "{point.label}")) %>%
+  hc_title(text = "By Total Number of Rape Crimes") %>%
+  hc_tooltip(useHTML = TRUE,
+             headerFormat = "<table>",
+             pointFormat = paste("<tr><th colspan=\"1\"><b>{point.label}</b></th></tr>",
+                                 "<tr><th>Year :</th<td> {point.x} </td></tr>",
+                                 "<tr><th>Rapes :</th<td>{point.y} </td></tr>",
+                                 "<tr><th></th><td>{point.valuecolor} </td></tr>"),
+             footerFormat = "</table>") %>% 
+  hc_add_theme(hc_theme_ffx())  %>% 
+  hc_chart(zoomType = "xy") %>% 
+  hc_credits(enabled = TRUE, text = "Sources: Swedish crime statistics | https://www.bra.se/", 
+             style = list(fontSize = "12px"))
+
+```
+
+<h4>This is really shocking! It's growing exponentially after 2004.</h4>
+<p>Following the incidents took place in Feb and March 2016, Police in Östersund, with a population of 45,000, say they have never seen anything like this before. The streets are deserted after dark in a sleepy Swedish town which is a now no-go zone for women after eight sex attacks in three weeks.
+
+Women have been warned by police not to walk alone at night after the once peaceful town of Östersund was shaken to its core by a string of vicious attacks on females and even children by groups of young men of 'foreign origin'.
+
+</p>
+
+```{r, message=FALSE, warning=FALSE, fig.width= 10, fig.height= 6.5}
+by_sexOff_rape_murder <- dfC %>% 
+  select(Year, rape, sexual.offenses) %>% 
+  melt(id = "Year") %>%
+  ggplot(aes(Year, value, fill=variable)) +
+  geom_bar(stat='identity', position='dodge') + 
+    ggtitle("Shocking Increase in Sexual Offenses and Rapes in Sweden")+ 
+    labs(x="Year", y="Total Number of Crimes") +
+    scale_x_continuous(limit = c(1949, 2016), breaks=seq(1950, 2016, by=5)) +
+    scale_y_continuous(limit = c(0, 220), breaks=seq(0, 220, by=20)) 
+ggplotly(by_sexOff_rape_murder) %>% layout(legend = list(orientation = 'h'))
+
+```
+
+###Let's compare Sexual Offense rate with Rape and Murder Rate
+```{r, message=FALSE, warning=FALSE, fig.width= 10, fig.height= 6}
+dfC %>% 
+  select(Year, sexual.offenses, rape, murder) %>% 
+  plot_ly(x = ~Year, y = ~sexual.offenses, name = 'Sexual Offenses', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~rape, name = 'Rape', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~murder, name = 'Murder', type = 'scatter', mode = 'lines') %>% layout(legend = list(orientation = 'h'))
+```
+
+
+###Now, let's see how other crime categories looks like over the years. 
+```{r, message=FALSE, warning=FALSE}
+dfC %>% 
+  select(Year, assault) %>%
+  hchart("scatter", hcaes(Year, assault, color = -(assault), size = assault),
+                       dataLabels = list(enabled = TRUE, format = "{point.label}")) %>%
+  hc_title(text = "By Total Number of Assaults") %>%
+  hc_tooltip(useHTML = TRUE,
+             headerFormat = "<table>",
+             pointFormat = paste("<tr><th colspan=\"1\"><b>{point.label}</b></th></tr>",
+                                 "<tr><th>Year :</th><td>{point.x}</td></tr>",
+                                 "<tr><th>Assaults :</th<td>{point.y}</td></tr>",
+                                 "<tr><th></th><td>{point.valuecolor}</td></tr>"),
+             footerFormat = "</table>") %>% 
+  hc_add_theme(hc_theme_ffx())  %>% 
+  hc_chart(zoomType = "xy") %>% 
+  hc_credits(enabled = TRUE, text = "Sources: Swedish crime statistics | https://www.bra.se/", 
+             style = list(fontSize = "12px"))
+
+dfC %>% 
+  select(Year, fraud) %>%
+  hchart("scatter", hcaes(Year, fraud, color = -(fraud), size = fraud),
+                       dataLabels = list(enabled = TRUE, format = "{point.label}")) %>%
+  hc_title(text = "By Total Number of Frauds") %>%
+  hc_tooltip(useHTML = TRUE,
+             headerFormat = "<table>",
+             pointFormat = paste("<tr><th colspan=\"1\"><b>{point.label}</b></th></tr>",
+                                 "<tr><th>Year :</th<td>{point.x} </td></tr>",
+                                 "<tr><th>Fraud :</th<td>{point.y} </td></tr>",
+                                 "<tr><th></th><td>{point.valuecolor} </td></tr>"),
+             footerFormat = "</table>") %>% 
+  hc_add_theme(hc_theme_ffx())  %>% 
+  hc_chart(zoomType = "xy") %>% 
+  hc_credits(enabled = TRUE, text = "Sources: Swedish crime statistics | https://www.bra.se/", 
+             style = list(fontSize = "12px"))
+
+dfC %>% 
+  select(Year, criminal.damage) %>%
+  hchart("scatter", hcaes(Year, criminal.damage, color = -(criminal.damage), size = criminal.damage),
+                       dataLabels = list(enabled = TRUE, format = "{point.label}")) %>%
+  hc_title(text = "By Total Number of Criminal Damages") %>%
+  hc_tooltip(useHTML = TRUE,
+             headerFormat = "<table>",
+             pointFormat = paste("<tr><th colspan=\"1\"><b>{point.label}</b></th></tr>",
+                                 "<tr><th>Year :</th<td>{point.x}</td></tr>",
+                                 "<tr><th>Criminal damage :</th<td>{point.y}</td></tr>",
+                                 "<tr><th></th><td>{point.valuecolor} </td></tr>"),
+             footerFormat = "</table>") %>% 
+  hc_add_theme(hc_theme_ffx())  %>% 
+  hc_chart(zoomType = "xy") %>% 
+  hc_credits(enabled = TRUE, text = "Sources: Swedish crime statistics | https://www.bra.se/", 
+             style = list(fontSize = "12px"))
+
+```
+
+
+###Let's also compare crime rate in Stealing and Robbery category
+```{r, message=FALSE, warning=FALSE, fig.width= 10, fig.height= 7}
+theft_robery <-  dfC %>% 
+  select(Year, burglary, house.theft, vehicle.theft, 
+         out.of.vehicle.theft, shop.theft, robbery) %>% 
+  plot_ly(x = ~Year, y = ~burglary, name = 'Burglary', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~out.of.vehicle.theft, name = 'Theft from vehicle', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~vehicle.theft, name = 'Vehicle theft', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~shop.theft, name = 'Shop theft', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~house.theft, name = 'House theft', type = 'scatter', mode = 'lines') %>%
+  add_trace(y = ~robbery, name = 'Roberry', type = 'scatter', mode = 'lines')
+theft_robery %>% layout(legend = list(orientation = 'h'))
+```
+
+
+####Searchable dataset
+```{r, message=FALSE, warning=FALSE}
+dfC %>% select(Year, population, crimes.total, sexual.offenses, rape, murder, assault ) %>%
+  arrange(desc(Year)) %>%
+  datatable(options = list(columnDefs = list(list(className = 'dt-center', targets = 7)),
+                                 pageLength = 5,lengthMenu = c(5, 10, 25, 50, 100)))
+```
+
+
+###Let's get an overview of crime severity by comparing them
+```{r, fig.width= 15, fig.height= 9}
+gs <- ggplot(dfC, aes(Year, stealing.general)) + geom_line(color = "gold3", size = 1) +
+  labs(x = "Total General Stealing", y = "Year", title = "General Stealing by Year")
+burglary <- ggplot(dfC, aes(Year, burglary)) + geom_line(color = "gold3", size = 1) +
+  labs(x = "Total Burglary", y = "Year", title = "Burglary by Year")
+ht <- ggplot(dfC, aes(Year, house.theft)) + geom_line(color = "gold3", size = 1) +
+  labs(x = "Total Thefts from House", y = "Year", title = "Thefts from House by Year")
+vt <- ggplot(dfC, aes(Year, vehicle.theft)) + geom_line(color = "gold3", size = 1) +
+  labs(x = "Total Vehicle Theft", y = "Year", title = "Vehicle Theft by Year")
+ovt <- ggplot(dfC, aes(Year, out.of.vehicle.theft)) + geom_line(color = "gold3", size = 1) +
+  labs(x = "Total Out of Vehicle Theft", y = "Year", title = "Out of Vehicle Theft by Year")
+st <- ggplot(dfC, aes(Year, shop.theft)) + geom_line(color = "gold3", size = 1) +
+  labs(x = "Total Shop Theft", y = "Year", title = "Shop Theft by Year")
+robbery <- ggplot(dfC, aes(Year, robbery)) + geom_line(color = "gold3", size = 1) +
+  labs(x = "Total Robbery", y = "Year", title = "Robbery by Year")
+```
+
+###Crimes under control
+```{r, fig.width= 15, fig.height= 9}
+grid.arrange(gs, burglary, ht, vt, ovt, st, robbery, ncol = 4)
+```
+
+```{r, fig.width= 15, fig.height= 9}
+Population <- ggplot(dfC, aes(Year, population)) + geom_line(color = "dodgerblue2", size = 1) +
+  labs(x = "Year", y = "Population", title = "Population by Year")
+tc <- ggplot(dfC, aes(Year, crimes.total)) + geom_line(color = "dodgerblue2", size = 1) +
+  labs(x = "Total Crimes", y = "Year", title = "Total Crimes by Year")
+tcpc <- ggplot(dfC, aes(Year, crimes.penal.code)) + geom_line(color = "dodgerblue2", size = 1) +
+  labs(x = "Total Crimes by Penal Code", y = "Year", title = "Total Crimes for Penal Code by Year")
+tcp <- ggplot(dfC, aes(Year, crimes.person)) + geom_line(color = "dodgerblue2", size = 1) +
+  labs(x = "Total Crimes Against Person", y = "Year", title = "Crimes Against Person by Year")
+murder <- ggplot(dfC, aes(Year, murder)) + geom_line(color = "dodgerblue2", size = 1) +
+  labs(x = "Total Murder", y = "Year", title = "Murder by Year")
+assault <- ggplot(dfC, aes(Year, assault)) + geom_line(color = "dodgerblue2", size = 1) +
+  labs(x = "Total Assaults", y = "Year", title = "Assaults by Year")
+```
+
+###Crimes that constantly growing
+```{r, fig.width= 15, fig.height= 9}
+grid.arrange(Population, tc, tcpc, tcp, murder, assault, ncol = 3)
+```
+
+
+```{r, fig.width= 15, fig.height= 9}
+so <- ggplot(dfC, aes(Year, sexual.offenses)) + geom_line(color = "red", size = 1) +
+  labs(x = "Total Sexual Offenses", y = "Year", title = "Sexual Offenses by Year")
+fraud <- ggplot(dfC, aes(Year, fraud), fraud) + geom_line(color = "red", size = 1) +
+  labs(x = "Total Fraud", y = "Year", title = "Fraud by Year")
+cd <- ggplot(dfC, aes(Year, criminal.damage)) + geom_line(color = "red", size = 1) +
+  labs(x = "Total Criminal Damage", y = "Year", title = "Criminal Damage by Year")
+opc <- ggplot(dfC, aes(Year, other.penal.crimes)) + geom_line(color = "red", size = 1) +
+  labs(x = "Total Penal Crimes (other)", y = "Year", title = "Other Penal Crimes by Year")
+narcotics <- ggplot(dfC, aes(Year, narcotics)) + geom_line(color = "red", size = 1) +
+  labs(x = "Total Narcotics", y = "Year", title = "Narcotics by Year")
+dd <- ggplot(dfC, aes(Year, drunk.driving)) + geom_line(color = "red", size = 1) +
+  labs(x = "Total Drunk Driving", y = "Year", title = "Drunk Driving by Year")
+```
+
+###Crimes that are shockingly growing
+```{r, fig.width= 15, fig.height= 9}
+grid.arrange(so, fraud, cd, opc, narcotics, dd, ncol = 3)
+```
+
+
+<br>
+<p> 
+According to a 2014 study published by the European Union Agency for Fundamental Rights (FRA), approximately one third of all women in the EU were said to have suffered physical and/or sexual abuse. At the top end was Denmark (52%), Finland (47%) and Sweden (46%). 
+
+Every second woman in the EU has experienced sexual harassment at least once since the age of 15. In Sweden that figure was 81 percent, closely followed by Denmark (80%) and France (75%). Included in the definition of "sexual harassment" was - among other things - inappropriate staring or leering and cyber harassment. The report concluded that there's a strong correlation between higher levels of gender equality and disclosure of sexual violence.
+</p> 
+<br>
+References: 
+
+* https://en.wikipedia.org/wiki/Crime_in_Sweden#Sex_crimes
+
+* https://www.usnews.com/news/best-countries/women-full-list

@@ -1,0 +1,49 @@
+---
+title: "Terrorist attacks around the world"
+author: "Pranav Pandya | s_pandya@stud.hwr-berlin.de"
+date: "10 December 2016 | Updated on 3rd March 2017"
+output: html_document
+---
+
+-----------------------------------------------------------
+
+#### 1. An interactive map to summarize Terrorist attacks around the world between 1970 to 2015.
+
+####Update (3rd March 2017) : Thanks to my new laptop with higher RAM capacity. Now I'm able to plot 152253 (97.11 %) out of 156772  terrorist attacks on a map with street level zoom. 
+ 
+
+```{r, message=FALSE, warning=FALSE, fig.width= 11, fig.height= 6}
+library(leaflet)
+library(dplyr)
+GT <- read.csv("../input/globalterrorismdb_0616dist.csv")
+GT01= GT[,c("iyear", "city", "country_txt", "latitude","longitude", "attacktype1_txt", "targtype1_txt", "targsubtype1_txt", 
+               "target1", "weaptype1_txt","weapsubtype1_txt", "gname", "motive", "summary")]
+# Ommiting NAs in latitude and longitude
+GT01 = GT01[!with(GT01,is.na(latitude)& is.na(longitude)),]
+mymap <- leaflet() %>% addTiles('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+                      attribution='Map tiles by <a href="http://stamen.com">Stamen Design</a>, 
+                      <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> &mdash; Map data &copy; 
+                      <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>') %>% 
+                      setView(15, 40, zoom= 2)
+LeafWorld = mymap %>% addCircles (data=GT01, lat= ~latitude, lng = ~longitude, 
+              popup=paste( "<strong>Year: </strong>", GT01$iyear, "<br><strong>City: </strong>", GT01$city, 
+                "<br><strong>Country: </strong>", GT01$country_txt, 
+                "<br><strong>Attack type: </strong>", GT01$attacktype1_txt, 
+                "<br><strong>Target: </strong>", GT01$targtype1_txt, " | ", GT01$targsubtype1_txt, " | ", GT01$target1, 
+                "<br><strong>Weapon: </strong>", GT01$weaptype1_txt, "<br><strong>Group: </strong>", GT01$gname, 
+                "<br><strong>Motive: </strong>", GT01$motive, "<br><strong>Summary: </strong>", GT01$summary),
+              weight = 0.6, color="#8B1A1A", stroke = TRUE, fillOpacity = 0.6)
+
+```
+
+###Terrorist attacks around the world between 1970 to 2015
+```{r, message=FALSE, warning=FALSE, fig.width= 11, fig.height= 6}
+LeafWorld
+```
+
+####Note
+#####1.) Zoom in to view the exact location of terror attack (up to street level anywhere in the world)
+#####2.) Click on any red point for specific details about that terror attack
+#####3.) If your Chrome doesn't load this map properly or hangs then try to increase Chrome's cache memory
+
+

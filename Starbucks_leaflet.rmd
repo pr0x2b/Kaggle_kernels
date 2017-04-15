@@ -1,0 +1,63 @@
+---
+title: "Where is the Nearest Starbucks???"
+author: "Pranav Pandya | s_pandya@stud.hwr-berlin.de"
+date: "8th March 2017"
+output: html_document
+---
+
+-----------------------------------------------------------
+
+```{r, message=FALSE, warning=FALSE}
+library(leaflet)
+library(dplyr)
+library(DT)
+
+#dfS <- read.csv("../input/directory.csv")
+
+dfS = read.csv("directory.csv")
+
+wmap <- leaflet() %>% 
+  addTiles('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+  attribution='Map tiles by <a href="http://stamen.com">Stamen Design</a>, 
+    <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> 
+    &mdash; Map data &copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>') %>%
+  setView(5, 40, zoom= 2)
+
+WorldStartbucks <- wmap %>% 
+  addCircles (data=dfS, lat= ~Latitude, lng = ~Longitude, 
+          popup=paste(dfS$Brand,
+            "<br><strong>Store Name: </strong>", dfS$Store.Name, 
+            "<br><strong>Street: </strong>", dfS$Street.Address, 
+            "<br><strong>City: </strong>", dfS$City, 
+            "<br><strong>Postcode: </strong>", dfS$Postcode, 
+            "<br><strong>State: </strong>", dfS$State.Province, 
+            "<br><strong>Country: </strong>", dfS$Country, 
+            "<br><strong>Phone Number: </strong>", dfS$Phone.Number, 
+            "<br><strong>Store Number: </strong>", dfS$dfS$Store.Number, 
+            "<br><strong>Ownership type: </strong>", dfS$Ownership.Type), weight = 3, 
+          color= ifelse(dfS$Country == "US", "#FF0000",
+                        ifelse(dfS$Country == "GB", "#FF0000",
+                               ifelse(dfS$Country == "CA", "springgreen",
+                                      ifelse(dfS$Country == "MX", "deeppink",
+                                             ifelse(dfS$Country == "JP", "springgreen",
+                                                    ifelse(dfS$Country == "CN", "orange",
+                                                    ifelse(dfS$Country == "KR", "lawngreen", "dodgerblue"))))))), 
+          stroke = TRUE, fillOpacity = 0.6) 
+```
+
+
+###Plotting all Starbucks stores on the map (street level zoom)
+- Click on any point on the map for specific details (Address, Phone number etc.)
+- Zoom in to view the exact location
+
+```{r, message=FALSE, warning=FALSE, fig.width= 10, fig.height=7}
+WorldStartbucks
+```
+
+#Store directory (Searchable)
+```{r, message=FALSE, warning=FALSE}
+directory <- dfS[, c(1,3,5,6,7,8,9)] 
+datatable(directory)
+```
+
+

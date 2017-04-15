@@ -1,0 +1,106 @@
+---
+title: "65 World Indexes"
+author: "Pranav Pandya | s_pandya@stud.hwr-berlin.de"
+date: "26th February 2017"
+output: html_document
+---
+
+-----------------------------------------------------------
+
+### Exploring "65 World Indexes" dataset in R with ggplot
+
+```{r, message=FALSE, warning=FALSE}
+#Making csv file readable (separating by comma)
+#WI = read.csv("HumanDevelopmentIndex.csv", sep=";", stringsAsFactors = FALSE, dec=",")
+
+WI = read.csv("Kaggle.csv")
+#names(WI)
+
+library(ggplot2) 
+library(ggrepel)
+library(dplyr)
+library(scales)
+
+WI$Human.Development.Index.HDI.2014 = as.numeric(WI$Human.Development.Index.HDI.2014)
+WI$Human.Development.Index.HDI.2014 <- round(WI$Human.Development.Index.HDI.2014, 2)
+
+HDI = WI[,1:2]
+names(HDI) <- c("country", "HDI")
+
+HDIplot= ggplot(HDI)+
+                geom_point(aes(country, HDI), size = 4, color = 'grey') +
+                geom_label_repel(
+                  aes(country, HDI, fill = factor(HDI), label = country),
+                  fontface = 'bold', color = 'white',
+                  box.padding = unit(0.35, "lines"),
+                  point.padding = unit(0.5, "lines"),
+                  segment.color = 'grey50')+
+                  ggtitle("Human Development Index by County")+
+                  labs(x="Countries",y="Human Development Index (2014)") + 
+                  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+###1.0 Human development index
+```{r, message=FALSE, warning=FALSE}
+WI$Human.Development.Index.HDI.2014 = as.numeric(WI$Human.Development.Index.HDI.2014)
+WI$Human.Development.Index.HDI.2014 <- round(WI$Human.Development.Index.HDI.2014, 2)
+
+HDI = WI[,1:2]
+names(HDI) <- c("country", "HDI")
+
+HDIplot= ggplot(HDI)+
+                geom_point(aes(country, HDI), size = 4, color = 'grey') +
+                geom_label_repel(
+                  aes(country, HDI, fill = factor(HDI), label = country),
+                  fontface = 'bold', color = 'white',
+                  box.padding = unit(0.35, "lines"),
+                  point.padding = unit(0.5, "lines"),
+                  segment.color = 'grey50')+
+                  ggtitle("Human Development Index by County")+
+                  labs(x="Countries",y="Human Development Index (2014)") + 
+                  theme(axis.text.x = element_text(angle = 90))
+```
+
+###1.0 Dot plot illustrating Human development index by country
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 14}
+HDIplot
+```
+
+- Almost 60% countries have HDI less than 0.65
+
+###2.0 Co2 emission
+
+```{r, message=FALSE, warning=FALSE}
+
+co2 = WI[, c("Id", "Carbon.dioxide.emissionsAverage.annual.growth")]
+names(co2) <- c("country", "co2emission")
+
+co2$co2emission = as.numeric(co2$co2emission)
+co2$co2emission <- round(co2$co2emission, 2)
+
+co2plot = ggplot(co2, aes(country, co2emission)) +
+            ggtitle("Avg. Annual growth in Co2 emission by Country")+
+            labs(x="Countries",y="Avg annual Co2 emission") +
+            geom_point(stat = "identity", color = 'grey', aes(fill = factor(co2emission))) + 
+            geom_label_repel( 
+              aes(country, co2emission, fill = factor(co2emission), label = country), 
+              fontface = 'bold', color = 'white',
+              box.padding = unit(0.35, "lines"),
+              point.padding = unit(0.5, "lines"),
+              segment.color = 'grey50') +
+            geom_text(aes(label = ifelse(co2emission>5, (co2emission), '')), size = 4, color = 'gray51') +
+            theme(legend.position = "none", axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+###2.1 Dot plot illustrating annual growth in Co2 emission by countries
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 14}
+co2plot 
+```
+
+- Bhutan, Equitorial Guinea and Oman represents shockingly high average annual growth in Co2 emission compared to other countries. 
+- However based on geographical area, China (6.53) and Indonesia (6.65) have considerably high Co2 emission.
+
+###3.0
+- to be continued...

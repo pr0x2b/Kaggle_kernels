@@ -1,0 +1,95 @@
+---
+title: "Terrorist attacks around the world (1970 to 2015)"
+author: "Pranav Pandya | s_pandya@stud.hwr-berlin.de"
+date: "10 December 2016"
+output: html_document
+---
+
+-----------------------------------------------------------
+
+#### 1. An interactive map to summarize Terrorist attacks around the world between 1970 to 2015.
+
+```{r, message=FALSE, warning=FALSE, fig.width= 11, fig.height= 6}
+
+setwd("C:/Users/Pranav/Documents/R/BIPM-R/Kaggle/Global Terrorism")
+GT = read.csv("globalterrorismdb_0616dist.csv")
+GT01= GT[,c("iyear", "city", "country_txt", "latitude","longitude",
+               "attacktype1_txt", "targtype1_txt", "targsubtype1_txt", 
+               "target1", "weaptype1_txt","weapsubtype1_txt", "gname", 
+               "motive", "summary")]
+
+# Ommiting blanks and NAs
+sum(is.na(GT01))
+GT01[GT01==""] <- NA
+GT01 = na.omit(GT01)
+
+#Total attacks plotted on the map are 45466 out of 156772
+# remaining 111306 couldn't plot as the page crashes. 
+
+#Interactive Plot 
+library(leaflet)
+library(dplyr)
+
+mymap <- 
+  leaflet() %>% 
+  addTiles('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+  attribution='Map tiles by 
+    <a href="http://stamen.com">Stamen Design</a>, 
+    <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> 
+    &mdash; 
+    Map data &copy; 
+    <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>') %>%
+  setView(15, 40, zoom= 3)
+
+mymap %>% 
+  addCircles (data=GT01, 
+              lat= ~latitude, 
+              lng = ~longitude, 
+              popup=paste(
+                "<strong>Year: </strong>", GT01$iyear,
+                "<br><strong>City: </strong>", GT01$city, 
+                "<br><strong>Country: </strong>", GT01$country_txt, 
+                "<br><strong>Attack type: </strong>", GT01$attacktype1_txt, 
+                "<br><strong>Target: </strong>", GT01$targtype1_txt, 
+                " | ", GT01$targsubtype1_txt, 
+                " | ", GT01$target1, 
+                "<br><strong>Weapon: </strong>", GT01$weaptype1_txt, 
+                "<br><strong>Group: </strong>", GT01$gname, 
+                "<br><strong>Motive: </strong>", GT01$motive, 
+                "<br><strong>Summary: </strong>", GT01$summary),
+              weight = 0.4, color="#8B1A1A", stroke = TRUE, fillOpacity = 0.6)
+
+```
+
+Highcharter
+```{r}
+library(dplyr)
+library(highcharter)
+library(viridisLite)
+library(countrycode)
+
+globalterror <- read.csv("globalterrorismdb_0616dist.csv")
+
+
+countries <- globalterror %>% group_by(country_txt) %>% summarise(Total = round(n()))
+names(countries) <- c("country.name", "total")
+
+countries$iso3 = countrycode(countries$country.name, 'country.name', 'iso3c')
+
+data(worldgeojson, package = "highcharter")
+dshmstops <- data.frame(q = c(0, exp(1:5)/exp(5)),
+                        c = substring(viridis(5 + 1, option = "D"), 0, 7)) %>%  list_parse2()
+
+highchart() %>% 
+  hc_add_series_map(worldgeojson, countries, value = "total", joinBy = "iso3") %>% 
+  hc_colorAxis(stops = dshmstops) %>% 
+  hc_legend(enabled = TRUE) %>% 
+  hc_add_theme(hc_theme_sparkline()) %>% 
+  hc_mapNavigation(enabled = TRUE) %>%
+  hc_title(text = "Global Terror Attacks 1970-2015") %>%
+  hc_add_theme(hc_theme_google()) %>%
+  hc_credits(enabled = TRUE, text = "Sources: National Consortium for the Study of Terrorism and Responses to Terrorism (START)", style = list(fontSize = "10px")) 
+
+
+```
+

@@ -1,0 +1,66 @@
+---
+title: "Terrorism in the US"
+author: "Pranav Pandya | s_pandya@stud.hwr-berlin.de"
+date: "5th March 2017"
+output: html_document
+---
+
+-----------------------------------------------------------
+
+```{r, message=FALSE, warning=FALSE}
+library(leaflet)
+library(dplyr)
+library(DT)
+library(ggplot2)
+library(plotly)
+
+GT <- read.csv("../input/globalterrorismdb_0616dist.csv")
+GT = read.csv("globalterrorismdb_0616dist.csv")
+TUS = GT[which(GT$country_txt=='United States'),] 
+
+mapUS <- leaflet() %>% 
+  addTiles('http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+  attribution='Map tiles by <a href="http://stamen.com">Stamen Design</a>, 
+    <a href="http://creativecommons.org/licenses/by/3.0">CC BY 3.0</a> 
+    &mdash; Map data &copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>') %>%
+  setView(-95, 35, zoom= 4)
+
+TerrorMapUS = mapUS %>% addCircles (data=TUS, lat= ~latitude, lng = ~longitude, 
+                popup=paste(
+                  "<strong>Year: </strong>", TUS$iyear,
+                  "<br><strong>Killings: </strong>", TUS$nkill,
+                  "<br><strong>City: </strong>", TUS$city, 
+                  "<br><strong>Country: </strong>", TUS$country_txt, 
+                  "<br><strong>Attack type: </strong>", TUS$attacktype1_txt, 
+                  "<br><strong>Target: </strong>", TUS$targtype1_txt, 
+                  " | ", TUS$targsubtype1_txt, " | ", TUS$target1, 
+                  "<br><strong>Weapon: </strong>", TUS$weaptype1_txt, 
+                  "<br><strong>Group: </strong>", TUS$gname, 
+                  "<br><strong>Motive: </strong>", TUS$motive, 
+                  "<br><strong>Summary: </strong>", TUS$summary),
+                weight = ifelse(TUS$iyear < 1990, 2,ifelse(TUS$iyear < 2000, 4, 7)), 
+                color= ifelse(TUS$iyear < 1990, "dodgerblue",ifelse(TUS$iyear < 2000, "lawngreen","#FF0000")), 
+                stroke = TRUE, fillOpacity = 0.6)
+```
+
+
+###Plotting all terror attacks on the map (street level zoom)
+####Note: 
+- 1.) Click on any point on the map for specific details
+- 2.) Zoom in to view the exact location
+
+####Color and size of points: 
+- RED and big circle = year > 2000
+- GREEN adn medium circle = year between 1990 and 200
+- BLUE and small circle = year < 1990
+          
+```{r, message=FALSE, warning=FALSE, fig.width= 9, fig.height=7}
+TerrorMapUS
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+#
+```
+
+

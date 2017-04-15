@@ -1,0 +1,219 @@
+---
+title: 'Everything You Need to Know About SpaceX Missions'
+author: "Pranav Pandya | s_pandya@stud.hwr-berlin.de"
+date: "3rd March 2017"
+output: html_document
+---
+
+-----------------------------------------------------------
+
+###Context
+
+SpaceX has gained worldwide attention for a series of historic milestones. It is the only private company ever to return a spacecraft from low-Earth orbit, which it first accomplished in December 2010. The company made history again in May 2012 when its Dragon spacecraft attached to the International Space Station, exchanged cargo payloads, and returned safely to Earth - a technically challenging feat previously accomplished only by governments. Since then Dragon has delivered cargo to and from the space station multiple times, providing regular cargo resupply missions for NASA.
+
+Under a $1.6 billion contract with NASA, SpaceX is flying numerous cargo resupply missions to the International Space Station, for a total of at least 20 flights under the Commercial Resupply Services contract. In 2016, NASA awarded SpaceX a second version of that contract that will cover a minimum of 6 additional flights from 2019 onward. In the near future, SpaceX will carry crew as part of NASA's Commercial Crew Program as well. Dragon was designed from the outset to carry astronauts and SpaceX is in the process of upgrading Dragon to make it crew-ready. SpaceX is the world's fastest-growing provider of launch services and has over 70 future missions on its manifest, representing over $10 billion in contracts. These include commercial satellite launches as well as NASA and other US Government missions.
+
+```{r, message=FALSE, warning=FALSE}
+dfS = read.csv("database.csv")
+
+library(dplyr)
+library(tidyr)
+library(data.table)
+library(sqldf)
+library(highcharter) 
+library(ggrepel)
+library(leaflet)
+library(viridisLite)
+library(countrycode)
+library(ggplot2)
+```
+
+###Data cleaning
+#####***Note: <span style="color:red">Due to missing values in Payload mass in KG for 8 missions in this dataset, count of total missions are less where Payload mass in KG variable has been used.</span> 
+```{r, message=FALSE, warning=FALSE}
+names(dfS) <- gsub("\\.", "", names(dfS))
+dfS$CustomerCountry = sub(x = dfS$CustomerCountry, pattern = "France (Mexico)", replacement = "France", fixed=T)
+
+dfS = data.table(sqldf(c("UPDATE dfS SET PayloadType = PayloadName WHERE PayloadType == ''", "SELECT * FROM main.dfS"), 
+                       method = "raw"))
+dfS = data.table(sqldf(c("UPDATE dfS SET PayloadOrbit = 'Unknown' WHERE PayloadOrbit == ''", "SELECT * FROM main.dfS"), 
+                       method = "raw"))
+dfS = data.table(sqldf(c("UPDATE dfS SET CustomerName = 'N/A' WHERE CustomerName == ''", "SELECT * FROM main.dfS"), 
+                       method = "raw"))
+dfS = data.table(sqldf(c("UPDATE dfS SET CustomerType = 'N/A' WHERE CustomerType == ''", "SELECT * FROM main.dfS"), 
+                       method = "raw"))
+dfS = data.table(sqldf(c("UPDATE dfS SET CustomerCountry = 'N/A'WHERE CustomerCountry == ''", "SELECT * FROM main.dfS"), 
+                       method = "raw"))
+dfS$PayloadMasskg[is.na(dfS$PayloadMasskg)] <- 'Unknown'
+
+dfS = as.data.frame(dfS)
+date.chr <- as.character(dfS$LaunchDate)
+date <- strptime(date.chr,format="%d %b %Y")
+dfS$LaunchDate = date
+dfS$LaunchDate = as.Date(dfS$LaunchDate)
+
+```
+
+###Now let's have a look at all SpaceX Missions by the country of customer
+```{r, message=FALSE, warning=FALSE}
+countries <- dfS %>% group_by(CustomerCountry) %>% summarise(total = round(n()))
+names(countries) <- c("country.name", "total")
+countries$iso3 = countrycode(countries$country.name, 'country.name', 'iso3c')
+data(worldgeojson, package = "highcharter")
+dshmstops <- data.frame(q = c(0, exp(1:5)/exp(5)), c = substring(viridis(5 + 1, option = "D"), 0, 7)) %>%  list_parse2()
+
+highchart() %>% 
+  hc_add_series_map(worldgeojson, countries, value = "total", joinBy = "iso3") %>% 
+  hc_colorAxis(stops = dshmstops) %>% hc_legend(enabled = TRUE) %>% hc_add_theme(hc_theme_ffx()) %>% 
+  hc_mapNavigation(enabled = TRUE) %>% hc_title(text = "___- SpaceX Missions by the country of customer") %>%
+  hc_credits(enabled = TRUE, text = "Sources: SpaceX, NASA", style = list(fontSize = "10px")) 
+
+```
+- USA is the major customer for SpaceX missions with total of 23 launches.
+
+###Let's explore this further to get an overview
+```{r, message=FALSE, warning=FALSE}  
+
+hchart(dfS$CustomerType, colorByPoint = TRUE, name = "Type of the customer") %>% 
+  hc_title(text = "SpaceX Missions by customer type") %>% hc_add_theme(hc_theme_ffx()) %>% 
+  hc_credits(enabled = TRUE, text = "Sources: SpaceX, NASA", style = list(fontSize = "10px"))
+
+hchart(dfS$CustomerCountry, colorByPoint = TRUE, name = "Customer's country") %>% 
+  hc_title(text = "SpaceX Missions by the country of customer") %>% hc_add_theme(hc_theme_flat()) %>% 
+  hc_credits(enabled = TRUE, text = "Sources: SpaceX, NASA", style = list(fontSize = "10px"))
+
+hchart(dfS$CustomerName, colorByPoint = TRUE, name = "Name of the customer") %>% 
+  hc_title(text = "SpaceX Missions by name of the customer") %>% hc_add_theme(hc_theme_ffx()) %>% 
+  hc_credits(enabled = TRUE, text = "Sources: SpaceX, NASA", style = list(fontSize = "10px"))
+
+hchart(dfS$LaunchSite, colorByPoint = TRUE, name = "Launch site") %>% 
+  hc_title(text = "SpaceX Missions by launch site") %>% hc_add_theme(hc_theme_ffx()) %>% 
+  hc_credits(enabled = TRUE, text = "Sources: SpaceX, NASA", style = list(fontSize = "10px"))
+
+hchart(dfS$VehicleType, colorByPoint = TRUE, name = "Vehicle type") %>% 
+  hc_title(text = "SpaceX Missions by vehicle type") %>% hc_add_theme(hc_theme_ffx()) %>% 
+  hc_credits(enabled = TRUE, text = "Sources: SpaceX, NASA", style = list(fontSize = "10px"))
+
+hchart(dfS$PayloadType, colorByPoint = TRUE, name = "Type of Paylod") %>% 
+  hc_title(text = "SpaceX Missions by type of Payload") %>% hc_add_theme(hc_theme_ffx()) %>% 
+  hc_credits(enabled = TRUE, text = "Sources: SpaceX, NASA", style = list(fontSize = "10px"))
+
+hchart(dfS$PayloadOrbit, colorByPoint = TRUE, name = "Type of Paylod orbit") %>% 
+  hc_title(text = "SpaceX Missions by type of Payload orbit") %>% hc_add_theme(hc_theme_sandsignika()) %>% 
+  hc_credits(enabled = TRUE, text = "Sources: SpaceX, NASA", style = list(fontSize = "10px"))
+
+hchart(dfS$MissionOutcome, colorByPoint = TRUE, name = "Mission outcome") %>% 
+  hc_title(text = "SpaceX Missions by mission outcome") %>% hc_add_theme(hc_theme_ffx()) %>% 
+  hc_credits(enabled = TRUE, text = "Sources: SpaceX, NASA", style = list(fontSize = "10px"))
+
+```
+
+###Now, let's explore success or failure of mission by comparing it with above mentioned parameters
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 11}
+ggplot(dfS)+ geom_point(aes(VehicleType, LaunchDate), size = 5, color = 'grey60') + 
+  geom_label_repel(aes(VehicleType, LaunchDate, fill = ifelse(dfS$MissionOutcome == 'Failure', 'Failure', 'Success'), 
+        label = PayloadMasskg),fontface = 'bold', color = 'white', size = 6, box.padding = unit(0.35, "lines"), 
+        point.padding = unit(0.5, "lines"),segment.color = 'grey50') +
+  ggtitle("SpaceX missions outcome by Year, Vehicle and Payload mass in KG")+ labs(x="Vehicle type",y="Year") + 
+  theme(legend.title = element_text(face = "bold", size = 16)) + theme(legend.text = element_text(size = 16)) +
+  theme(legend.position = "bottom")+ labs(fill = "Mission Outcome") +  
+  theme(plot.title = element_text(size = 22, face = "bold")) +
+  theme(axis.text=element_text(size=13), axis.title=element_text(size=16,face="bold"))
+```
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 12}
+ggplot(dfS)+ geom_point(aes(LaunchSite, LaunchDate), size = 4, color = 'grey60') +
+  geom_label_repel(aes(LaunchSite, LaunchDate, fill = ifelse(dfS$MissionOutcome == 'Failure', 'Failure', 'Success'), 
+       label = VehicleType), fontface = 'bold', color = 'white', size = 4, box.padding = unit(0.35, "lines"),
+       point.padding = unit(0.5, "lines"),segment.color = 'grey50') +
+  ggtitle("SpaceX missions outcome by Year, Launch site and Vehicle type")+ labs(x="Launch site",y="Year") + 
+  theme(legend.title = element_text(face = "bold", size = 16)) + theme(legend.text = element_text(size = 16)) +
+  theme(legend.position = "bottom")+ labs(fill = "Mission Outcome") +  
+  theme(plot.title = element_text(size = 22, face = "bold")) +
+  theme(axis.text=element_text(size=13), axis.title=element_text(size=16,face="bold"))
+```
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 11}
+ggplot(dfS)+ geom_point(aes(LaunchSite, LaunchDate), size = 5, color = 'grey60') +
+  geom_label_repel(aes(LaunchSite, LaunchDate, fill = ifelse(dfS$MissionOutcome == 'Failure', 'Failure', 'Success'), 
+      label = PayloadType), fontface = 'bold', color = 'white', size = 5, box.padding = unit(0.35, "lines"), 
+      point.padding = unit(0.5, "lines"),segment.color = 'grey50') +
+  ggtitle("SpaceX missions outcome by Year, Launch Site and Payload Type")+ labs(x="Launch site",y="Year") + 
+  theme(legend.title = element_text(face = "bold", size = 16)) + theme(legend.text = element_text(size = 16)) +
+  theme(legend.position = "bottom")+ labs(fill = "Mission Outcome") + 
+  theme(plot.title = element_text(size = 22, face = "bold")) +
+  theme(axis.text=element_text(size=13), axis.title=element_text(size=16,face="bold"))
+```
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 11}
+ggplot(dfS)+ geom_point(aes(VehicleType, LaunchDate), size = 5, color = 'grey60') +
+  geom_label_repel(aes(VehicleType, LaunchDate, fill = ifelse(dfS$MissionOutcome == 'Failure', 'Failure', 'Success'), 
+      label = PayloadOrbit), fontface = 'bold', color = 'white', size = 5, box.padding = unit(0.35, "lines"), 
+      point.padding = unit(0.5, "lines"),segment.color = 'grey50') +
+  ggtitle("SpaceX missions outcome by Year, Vehicle type and Payload Orbit")+  labs(x="Vehicle type",y="Year") + 
+  theme(legend.title = element_text(face = "bold", size = 16)) + theme(legend.text = element_text(size = 16)) +
+  theme(legend.position = "bottom")+ labs(fill = "Mission Outcome") + 
+  theme(plot.title = element_text(size = 22, face = "bold")) +
+  theme(axis.text=element_text(size=13), axis.title=element_text(size=16,face="bold"))
+```
+
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 11}
+ggplot(dfS)+ geom_point(aes(CustomerType, LaunchDate), size = 5, color = 'grey60') +
+  geom_label_repel(aes(CustomerType, LaunchDate, fill = ifelse(dfS$MissionOutcome == 'Failure', 'Failure', 'Success'), 
+      label = CustomerCountry), fontface = 'bold', color = 'white', size = 6, box.padding = unit(0.35, "lines"), 
+      point.padding = unit(0.5, "lines"),segment.color = 'grey50') +
+  ggtitle("SpaceX missions outcome by Year, Customer type and Customer's country")+ labs(x="Customer type",y="Year") + 
+  theme(legend.title = element_text(face = "bold", size = 16)) + theme(legend.text = element_text(size = 16)) +
+  theme(legend.position = "bottom")+ labs(fill = "Mission Outcome") + 
+  theme(plot.title = element_text(size = 22, face = "bold")) +
+  theme(axis.text=element_text(size=13), axis.title=element_text(size=16,face="bold"))
+
+```
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 11}
+ggplot(dfS)+ geom_point(aes(VehicleType, LaunchTime), size = 5, color = 'grey60') +
+  geom_label_repel(aes(VehicleType, LaunchTime, fill = ifelse(dfS$MissionOutcome == 'Failure', 'Failure', 'Success'), 
+      label = CustomerName), fontface = 'bold', color = 'white', size = 6, box.padding = unit(0.35, "lines"), 
+      point.padding = unit(0.5, "lines"),segment.color = 'grey50') +
+  ggtitle("SpaceX missions outcome by Launch time, Vehicle type and Customer's name")+ labs(x="Vehicle type",y="Launch time") + 
+  theme(legend.title = element_text(face = "bold", size = 16)) + theme(legend.text = element_text(size = 16)) +
+  theme(legend.position = "bottom")+ labs(fill = "Mission Outcome") + 
+  theme(plot.title = element_text(size = 22, face = "bold")) +
+  theme(axis.text=element_text(size=13), axis.title=element_text(size=16,face="bold"))
+```
+
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 11}
+ggplot(dfS)+ geom_point(aes(CustomerCountry, LaunchTime), size = 5, color = 'grey60') +
+  geom_label_repel(aes(CustomerCountry, LaunchTime, fill = ifelse(dfS$MissionOutcome == 'Failure', 'Failure', 'Success'), 
+      label = CustomerName), fontface = 'bold', color = 'white', size = 6, box.padding = unit(0.35, "lines"), 
+      point.padding = unit(0.5, "lines"),segment.color = 'grey50') +
+  ggtitle("SpaceX missions outcome by Launch time, Customer's country and Customer's name")+ 
+  labs(x="Customer's country",y="Launch time") + 
+  theme(legend.title = element_text(face = "bold", size = 16)) + theme(legend.text = element_text(size = 16)) +
+  theme(legend.position = "bottom")+ labs(fill = "Mission Outcome") + 
+  theme(plot.title = element_text(size = 22, face = "bold")) +
+  theme(axis.text=element_text(size=13), axis.title=element_text(size=16,face="bold"))
+```
+
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 11}
+dfS$PayloadMasskg = as.integer(dfS$PayloadMasskg)
+
+ggplot(dfS)+ geom_point(aes(LaunchDate, PayloadMasskg), size = 5, color = 'grey60') +
+  geom_label_repel(aes(LaunchDate, PayloadMasskg, fill = ifelse(dfS$MissionOutcome == 'Failure', 'Failure', 'Success'), 
+      label = CustomerCountry), fontface = 'bold', color = 'white', size = 6, box.padding = unit(0.35, "lines"), 
+      point.padding = unit(0.5, "lines"),segment.color = 'grey50') +
+  ggtitle("SpaceX missions outcome by Year, Payload mass in KG and Customer's country")+ labs(x="Year",y="Payload mass in KG") + 
+  theme(legend.title = element_text(face = "bold", size = 16)) + theme(legend.text = element_text(size = 18)) +
+  theme(legend.position = "bottom")+ labs(fill = "Mission Outcome") +
+  theme(plot.title = element_text(size = 22, face = "bold")) +
+  theme(axis.text=element_text(size=13), axis.title=element_text(size=16,face="bold"))
+```
+
+
+
+
+###Finding Correlations
+####To be continued...

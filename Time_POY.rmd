@@ -1,0 +1,136 @@
+---
+title: "Trump's Up (-_-* ) Time's Award Controversy!"
+author: "Pranav Pandya | s_pandya@stud.hwr-berlin.de"
+date: "10th March 2017"
+output: html_document
+---
+
+-----------------------------------------------------------
+
+```{r, message=FALSE, warning=FALSE}
+dfS = read.csv("archive.csv")
+#dfS = read.csv("../input/archive.csv")
+library(dplyr)
+library(data.table)
+library(sqldf)
+library(highcharter) 
+library(countrycode)
+library(viridisLite)
+library(ggrepel)
+library(ggplot2)
+library(scales)
+library(DT)
+
+#Data cleaning 
+dfS = data.frame(sqldf(c("UPDATE dfS SET Title = Name WHERE Title == ''", "SELECT * FROM main.dfS"), method = "raw"))
+dfS = data.frame(sqldf(c("UPDATE dfS SET Context = 'Missing data' WHERE Context == ''", "SELECT * FROM main.dfS"), method = "raw"))
+dfS = data.frame(sqldf(c("UPDATE dfS SET Country = 'Missing data' WHERE Country == ''", "SELECT * FROM main.dfS"), method = "raw"))
+dfS = data.frame(sqldf(c("UPDATE dfS SET Category = 'Pilot' WHERE Title == 'US Air Mail Pilot'", 
+                         "SELECT * FROM main.dfS"), method = "raw"))
+```
+
+
+```{r, message=FALSE, warning=FALSE}
+countries <- dfS %>% group_by(Country) %>% summarise(total = round(n()))
+names(countries) <- c("country.name", "total")
+countries$iso3 = countrycode(countries$country.name, 'country.name', 'iso3c')
+data(worldgeojson, package = "highcharter")
+dshmstops <- data.frame(q = c(0, exp(1:5)/exp(5)), c = substring(viridis(5 + 1, option = "D"), 0, 7)) %>%  list_parse2()
+
+highchart() %>% 
+  hc_add_series_map(worldgeojson, countries, value = "total", joinBy = "iso3") %>% 
+  hc_colorAxis(stops = dshmstops) %>% hc_legend(enabled = TRUE) %>% hc_add_theme(hc_theme_ffx()) %>% 
+  hc_mapNavigation(enabled = TRUE) %>% hc_title(text = "Time's Honors by Country") %>%
+  hc_credits(enabled = TRUE, text = "Source: Data from Time Magazine", style = list(fontSize = "10px")) 
+```
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 55}
+dfS %>% group_by(Year, Honor, Name, Country, Title, Context) %>% 
+  ggplot()+ 
+    geom_point(aes(Honor, Year), size = 5, color = 'grey') +
+    geom_label_repel(aes(Honor, Year, fill = factor(Honor), label = Name),
+      fontface = 'bold', size = 5, color = 'white', box.padding = unit(0.35, "lines"),
+      point.padding = unit(0.5, "lines"),segment.color = 'grey50')+
+    ggtitle("Time's Honors by Category, Year and Person")+ labs(x="Honor Type",y="Year") +
+    scale_y_continuous(limit = c(1925, 2016), breaks=seq(0, 2016, by=1)) +
+    geom_text(aes(Honor, Year, label = Category), size = 4, color = 'grey50', fontface = 'bold', hjust = 1, nudge_x = -0.3) +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 17)) +
+    theme(legend.position = "top")+ labs(fill = "Honor") +  
+    theme(plot.title = element_text(size = 22, face = "bold")) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16,face="bold"), 
+          axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r, message=FALSE, warning=FALSE, fig.width= 15, fig.height= 25}
+dfS %>% group_by(Year, Honor, Name, Country, Title, Context) %>% 
+  ggplot()+ 
+    geom_point(aes(Category, Year), size = 5, color = 'grey') +
+    geom_label_repel(aes(Category, Year, fill = factor(Category), label = Context),
+      fontface = 'bold', size = 5, color = 'white', box.padding = unit(0.35, "lines"),
+      point.padding = unit(0.5, "lines"),segment.color = 'grey50')+
+    ggtitle("Byy Year and Category")+ labs(x="Category Type",y="Year") +
+    scale_y_continuous(limit = c(1925, 2016), breaks=seq(0, 2016, by=1)) +
+    theme(legend.title = element_text(face = "bold", size = 16)) + 
+    theme(legend.text = element_text(size = 17)) +
+    theme(legend.position = "top")+ labs(fill = "Category") +  
+    theme(plot.title = element_text(size = 22, face = "bold")) +
+    theme(axis.text=element_text(size=14), axis.title=element_text(size=16,face="bold"), 
+          axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+```{r, message=FALSE, warning=FALSE}
+dfS %>% group_by(Honor) %>% summarise(total = n()) %>% arrange(desc(total)) %>%
+  hchart("bar", hcaes(x = Honor, y = total, color = -(total))) %>%
+  hc_title(text = "Time's Number of Honors by Category") %>%
+  hc_add_theme(hc_theme_ffx()) 
+
+dfS %>% group_by(Country) %>% summarise(total = n()) %>% arrange(desc(total)) %>%
+  hchart("bar", hcaes(x = Country, y = total, color = -total)) %>%
+  hc_title(text = "Time's Honors by Country") %>%
+  hc_add_theme(hc_theme_ffx()) 
+
+```
+####It's noticeable that Man and US origins is favorable category for Time Magazine over the years. BUt still, that's not the controversy.
+
+###Let's further analyse award distrubution only in the US to see where the controversy is!
+```{r, message=FALSE, warning=FALSE}
+dfS %>% filter (Country == "United States") %>% group_by(Honor) %>% 
+  summarise(total = n()) %>% arrange(desc(total)) %>%
+  hchart("bar", hcaes(x = Honor, y = total, color = -total)) %>%
+  hc_title(text = "Time's Honors by Honor Type in the US") %>%
+  hc_add_theme(hc_theme_ffx()) 
+
+dfS %>% filter (Country == "United States") %>% group_by(Category) %>% 
+  summarise(total = n()) %>% arrange(desc(total)) %>%
+  hchart("column", hcaes(x = Category, y = total, color = -total)) %>%
+  hc_title(text = "Time's Honors by Category in the US") %>%
+  hc_add_theme(hc_theme_ffx()) 
+
+#Honor's more than 1
+dfS %>% filter (Country == "United States") %>% group_by(Title) %>%
+  summarise(total = n()) %>% arrange(desc(total)) %>% filter(total > 1)  %>%
+  hchart("column", hcaes(x = Title, y = total, color = -total)) %>%
+  hc_title(text = "Time's Honors (>1) by Person's Title in the US") %>%
+  hc_add_theme(hc_theme_ffx()) 
+```
+
+####Searchbale dataset
+```{r}
+dfS %>% select(Year, Honor, Country, Category, Name, Title) %>% arrange(desc(Year)) %>%
+  datatable(options = list(columnDefs = list(list(className = 'dt-center', targets = 6)),
+                                 pageLength = 5,lengthMenu = c(5, 10, 25, 50, 100)))
+```
+
+
+####So it's clear that winning US presidential election means most probably you'll be the person of the year. Any conclusion can be drawn from Time's 84 years of selection pattern however I would like to quote a text from Time's website which somehow justifies presidential selection controversy. 
+
+"After all, the President of the United States is said to be the leader of the free world, and the coming of a new administration can lead to a wave of change throughout the country and around the world. But, though it has been two decades since an exception has been made, it is in fact not the case that winning the U.S. presidential election is an automatic ticket to Person of the Year status.
+
+The most recent exception was in 1996, when Bill Clinton was reelected and AIDS researcher Dr. David Ho was Person of the Year. Previous non-president picks include the Earth (Planet of the year 1988, over George H.W. Bush), U.S. Scientists (People of the Year 1960, over John F. Kennedy) and Queen Elizabeth II (Person of the Year 1952, over Dwight D. Eisenhower). And in 1972 the election victor shared the cover (Richard Nixon with Henry Kissinger).
+
+When a man has become president via a means other than an election, the results are similarly mixed. Harry Truman was Person of the Year in 1945 following FDR's death, but Martin Luther King Jr. was Person of the Year following JFK's assassination in 1963 and King Faisal of Saudi Arabia following Nixon's resignation in 1974."
+
+
